@@ -1,0 +1,3 @@
+Automagica==1.0.2
+xlrd==1.2.0
+pandas==0.25.1
