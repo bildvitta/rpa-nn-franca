@@ -1,17 +1,21 @@
 from automagica import *
-import pandas as pd 
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+import pandas as pd
+import datetime
+import smtplib
 import time
+
+process_arr_data = []
 
 '''
 Read information from .xls and interactively use crawl() function to get information about each one.
-
-Pandas read excel: https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_excel.html
+Pandas read excel: https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_excel.html.
 
 '''
 def readInformation(fileName):
 
 	website = 'https://www.franca.sp.gov.br/portal-servico/paginas/publica/processo/consulta.xhtml'
-
 
 	dataFrame = pd.read_excel(io=fileName)
 	#print (dataFrame.head(5))
@@ -21,10 +25,10 @@ def readInformation(fileName):
 	rows = dataFrame['ANO'].count()
 	year, process, password = '','',''
 
-	#Inside rows
-	for r in range(6,rows):
+	#Inside rows of .xls
+	for r in range(0,rows):
 		#Inside columns
-		for s in range(0,6): 
+		for s in range(0,6):
 			#print (dataFrame.iloc[r,s])
 			if (s == 0):
 				year = str(dataFrame.iloc[r,s])
@@ -43,6 +47,7 @@ def readInformation(fileName):
 		#Crawl information about selected process.
 		crawl(website,year,process,password)
 		print ('----------- Done ' + str(r) + ' -----------')
+
 
 '''
 Crawl information about each process.
@@ -79,6 +84,7 @@ def crawl(website, year, process, password):
 	#print(innerPagePosition)
 
 	time.sleep(2)
+
 	#Catch the last position, latest move.
 	data = browser.find_element_by_xpath('//*[@id="formConsulta:j_idt143_data"]/tr[' + str(innerPagePosition) + ']/td[2]') 
 	#print(data.text)
@@ -93,21 +99,72 @@ def crawl(website, year, process, password):
 
 	#print(type(data.text))
 	if (checkData(data.text)):
-		# SE A DATA FOR IGUAL A DO DIA, ENVIAR NOTIFICAÇÃO
-		print ('Via e-mail')
+
+		process_arr_data.append({'Data':data.text, 'Texto':origin.text, 'Destino':destination.text,'Manifestaçaõ':manifest.text})
+		print ('Houve alteração e precisa enviar.')
+
 	else:
-		print ('Equal')
+		print ('Não é igual então não precisa enviar.')
 
 	browser.close()
 
-def checkData (data):
-	print (data)
-	print ('Time data: ' + str(time.strftime("%c"))) #Thu Sep  5 19:05:56 2019
-	return (str(time.strftime("%c")) == data) if print("It's Equal") else print("It's Equal")
+
+
+# Checking if there was a change in processes date.
+def checkData (date):
+	print (date)
+	#print ('Time data: ' + str(time.strftime("%c"))) #Thu Sep  5 19:05:56 2019
+	curr_date = datetime.datetime.now()
+	curr_format_date = curr_date.strftime("%d/%m/%Y")
+	print(curr_format_date) 
+	#str(time.strftime("%c")
+	return (curr_format_date == date) if True else False
+
+
+#Connect to SMTP only if is necessary (some process changed).
+def connectSMTP ():
+
+	text = 'Teste RPA incorporacao'
+
+	server = smtplib.SMTP('server',number)
+
+	server.ehlo()
+	server.starttls()
+	server.ehlo()
+
+	#From email
+	fromaddr = ''
+	#To email
+	toaddr = ''
+
+	#Prepare mesage
+	msg = MIMEMultipart()
+	msg['From'] = fromaddr
+	msg['To'] = toaddr
+	msg['Subject'] = 'Relatório de Processos - Incorporação Bild | Vitta Franca'
+
+	content = 'Hello World'
+	#content = str(process_arr_data)
+
+	msg.attach(MIMEText(content,'plain'))
+
+	server.login(fromaddr,'yourpassword')
+	server.sendmail(fromaddr,toaddr,msg.as_string())
+
+	server.quit()
 
 
 if __name__ == "__main__":
 
+	#Path to .xls file.
 	processTables = 'processos-regional-franca.xlsx'
+
+	#Just to test
+	#connectSMTP()
 	
 	readInformation(processTables)
+
+	if process_arr_data:
+
+		#Connect SMTP and send process update message.
+		connectSMTP()
