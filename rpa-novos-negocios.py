@@ -88,7 +88,7 @@ def crawl(website, year, process, password):
 	print (data.text,origin.text,destination.text,manifest.text)
 
 	if (checkData(data.text)):
-		process_arr_data.append({'Data':data.text, 'Texto':origin.text, 'Destino':destination.text,'Manifestaçaõ':manifest.text})
+		process_arr_data.append({'Ano':year, 'Protocolo': process,'Processo':password,'Data':data.text, 'Texto':origin.text, 'Destino':destination.text,'Manifestação':manifest.text})
 		print ('Houve alteração e precisa enviar.')
 
 	else:
@@ -139,7 +139,7 @@ def connectSMTP ():
 #Format text to send as email body
 def formatText ():
 
-	text = ''
+	text = 'Olá, tudo bem? Eu sou o robozinho que veio ajudar na verificação do andamento dos processos. Segue abaixo os protocolos que foram atualizados recentemente!\n\n\n'
 
 	for index_arr in range(len(process_arr_data)):
 		for key,val in process_arr_data[index_arr].items():
