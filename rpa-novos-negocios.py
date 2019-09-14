@@ -8,20 +8,12 @@ import time
 
 process_arr_data = []
 
-'''
-Read information from .xls and interactively use crawl() function to get information about each one.
-Pandas read excel: https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_excel.html.
-
-'''
 def readInformation(fileName):
 
 	website = 'https://www.franca.sp.gov.br/portal-servico/paginas/publica/processo/consulta.xhtml'
 
 	dataFrame = pd.read_excel(io=fileName)
-	#print (dataFrame.head(5))
-	#print (dataFrame.head())
-	#print (dataFrame.iloc[0,0])
-	#print(dataFrame['ANO'].count()) #Number of rows in excel.
+
 	rows = dataFrame['ANO'].count()
 	year, process, password = '','',''
 
@@ -46,12 +38,10 @@ def readInformation(fileName):
 
 		#Crawl information about selected process.
 		crawl(website,year,process,password)
-		print ('----------- Done ' + str(r) + ' -----------')
+		print ('----------- Done ' + str(r+1) + ' -----------')
 
 
-'''
-Crawl information about each process.
-'''
+#Crawl information about each process.
 def crawl(website, year, process, password):
 
 	browser = ChromeBrowser()
@@ -97,9 +87,7 @@ def crawl(website, year, process, password):
 
 	print (data.text,origin.text,destination.text,manifest.text)
 
-	#print(type(data.text))
 	if (checkData(data.text)):
-
 		process_arr_data.append({'Data':data.text, 'Texto':origin.text, 'Destino':destination.text,'Manifestaçaõ':manifest.text})
 		print ('Houve alteração e precisa enviar.')
 
@@ -107,7 +95,6 @@ def crawl(website, year, process, password):
 		print ('Não é igual então não precisa enviar.')
 
 	browser.close()
-
 
 
 # Checking if there was a change in processes date.
@@ -124,34 +111,42 @@ def checkData (date):
 #Connect to SMTP only if is necessary (some process changed).
 def connectSMTP ():
 
-	text = 'Teste RPA incorporacao'
-
-	server = smtplib.SMTP('server',number)
-
+	#connect to smpt server
+	server = smtplib.SMTP('smtpserver',port)
 	server.ehlo()
 	server.starttls()
 	server.ehlo()
 
-	#From email
+	#from email
 	fromaddr = ''
-	#To email
+	#to email
 	toaddr = ''
 
-	#Prepare mesage
 	msg = MIMEMultipart()
 	msg['From'] = fromaddr
 	msg['To'] = toaddr
 	msg['Subject'] = 'Relatório de Processos - Incorporação Bild | Vitta Franca'
 
-	content = 'Hello World'
-	#content = str(process_arr_data)
+	#body = 'Ola mundo'
+	body = formatText()
+	#body = str(process_arr_data) # or plain do a table or something else
+	msg.attach(MIMEText(body,'plain'))
 
-	msg.attach(MIMEText(content,'plain'))
-
-	server.login(fromaddr,'yourpassword')
+	server.login(fromaddr,'yourpasswd')
 	server.sendmail(fromaddr,toaddr,msg.as_string())
+	server.quit()	
 
-	server.quit()
+#Format text to send as email body
+def formatText ():
+
+	text = ''
+
+	for index_arr in range(len(process_arr_data)):
+		for key,val in process_arr_data[index_arr].items():
+			text += str(key) + ": " + str(val) + '\n'
+		text += '\n\n'
+	#print (text)
+	return (text)
 
 
 if __name__ == "__main__":
@@ -162,9 +157,10 @@ if __name__ == "__main__":
 	#Just to test
 	#connectSMTP()
 	
+	#Initiate looping inside each process from .xls
 	readInformation(processTables)
 
+	#If There is any change in processes progress, will be send and e-mail for the responsible.
 	if process_arr_data:
-
 		#Connect SMTP and send process update message.
 		connectSMTP()
