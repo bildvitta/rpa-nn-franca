@@ -7,15 +7,15 @@ import smtplib
 import time
 
 process_arr_data = []
+browser = ChromeBrowser()
 
 def readInformation(fileName):
 
 	website = 'https://www.franca.sp.gov.br/portal-servico/paginas/publica/processo/consulta.xhtml'
 
 	dataFrame = pd.read_excel(io=fileName)
-
 	rows = dataFrame['ANO'].count()
-	year, process, password = '','',''
+	year, process, password, process_name, project_name = '','','','',''
 
 	#Inside rows of .xls
 	for r in range(0,rows):
@@ -33,18 +33,23 @@ def readInformation(fileName):
 			elif (s == 2):
 				password = str(dataFrame.iloc[r,s])
 				print (password)
+			elif (s == 4):
+				project_name = str(dataFrame.iloc[r,s])
+				print (project_name)
 			else:
 				pass
 
 		#Crawl information about selected process.
-		crawl(website,year,process,password)
+		crawl(website,year,process,password, project_name)
 		print ('----------- Done ' + str(r+1) + ' -----------')
 
+	return browser.close()
 
-#Crawl information about each process.
-def crawl(website, year, process, password):
+'''
+Crawl information about each process.
+'''
+def crawl(website, year, process, password,project_name):
 
-	browser = ChromeBrowser()
 	browser.get(website)
 
 	browser.find_element_by_id('formConsulta:anoMask:mskInput').click()
@@ -56,24 +61,29 @@ def crawl(website, year, process, password):
 	browser.find_element_by_id('formConsulta:senhaMask:pwdInput').click()
 	browser.find_element_by_id('formConsulta:senhaMask:pwdInput').send_keys(password)
 
-	time.sleep(2)
+	#time.sleep(2)
 	browser.find_element_by_id('formConsulta:j_idt60').click()
 
-	#print (len(browser.find_elements_by_xpath('//*[@id="formConsulta:j_idt108_data"]/tr')))
 	position = (len(browser.find_elements_by_xpath('//*[@id="formConsulta:j_idt108_data"]/tr')))
 	#print (position)
+
+	try:
+		process_name = (str(browser.find_element_by_xpath('//*[@id="formConsulta:cabecalhoProcesso_content"]/table/tbody/tr[3]/td/label').text))
+		print (process_name)
+	except:
+		print ('Error in find process name')
 
 	try:
 		browser.find_element_by_xpath('//*[@id="formConsulta:j_idt108_data"]/tr[' + str(position) + ']/td/a').click() 
 	except:
 		print ("Without URL")
 
-	time.sleep(2)
+	time.sleep(0.8)
 
 	innerPagePosition = len(browser.find_elements_by_xpath('//*[@id="formConsulta:j_idt143_data"]/tr'))
 	#print(innerPagePosition)
 
-	time.sleep(2)
+	#time.sleep(2)
 
 	#Catch the last position, latest move.
 	data = browser.find_element_by_xpath('//*[@id="formConsulta:j_idt143_data"]/tr[' + str(innerPagePosition) + ']/td[2]') 
@@ -88,13 +98,12 @@ def crawl(website, year, process, password):
 	print (data.text,origin.text,destination.text,manifest.text)
 
 	if (checkData(data.text)):
-		process_arr_data.append({'Ano':year, 'Protocolo': process,'Processo':password,'Data':data.text, 'Texto':origin.text, 'Destino':destination.text,'Manifestação':manifest.text})
+		process_arr_data.append({'Ano':year, 'Nome do projeto':project_name,'Protocolo': process,'Nome do Processo': process_name, 'Processo':password,'Data':data.text, 'Texto':origin.text, 'Destino':destination.text,'Manifestação':manifest.text})
 		print ('Houve alteração e precisa enviar.')
 
 	else:
 		print ('Não é igual então não precisa enviar.')
 
-	browser.close()
 
 
 # Checking if there was a change in processes date.
@@ -111,32 +120,31 @@ def checkData (date):
 #Connect to SMTP only if is necessary (some process changed).
 def connectSMTP ():
 
-	#connect to smpt server
-	server = smtplib.SMTP('smtpserver',port)
+	server = smtplib.SMTP('server',port)
+
 	server.ehlo()
 	server.starttls()
 	server.ehlo()
 
-	#from email
-	fromaddr = ''
-	#to email
-	toaddr = ''
+	fromaddr = 'fromemail'
+	toaddr = 'toemail@gmail.com'
 
 	msg = MIMEMultipart()
 	msg['From'] = fromaddr
 	msg['To'] = toaddr
-	msg['Subject'] = 'Relatório de Processos - Incorporação Bild | Vitta Franca'
+	msg['Subject'] = 'Relatório de Acompanhamento RPA - Incorporação Bild & Vitta Franca'
 
 	#body = 'Ola mundo'
 	body = formatText()
 	#body = str(process_arr_data) # or plain do a table or something else
 	msg.attach(MIMEText(body,'plain'))
 
-	server.login(fromaddr,'yourpasswd')
+	server.login(fromaddr,'password')
 	server.sendmail(fromaddr,toaddr,msg.as_string())
-	server.quit()	
 
-#Format text to send as email body
+	return server.quit()	
+
+
 def formatText ():
 
 	text = 'Olá, tudo bem? Eu sou o robozinho que veio ajudar na verificação do andamento dos processos. Segue abaixo os protocolos que foram atualizados recentemente!\n\n\n'
@@ -145,7 +153,7 @@ def formatText ():
 		for key,val in process_arr_data[index_arr].items():
 			text += str(key) + ": " + str(val) + '\n'
 		text += '\n\n'
-	#print (text)
+	print (text)
 	return (text)
 
 
@@ -157,10 +165,9 @@ if __name__ == "__main__":
 	#Just to test
 	#connectSMTP()
 	
-	#Initiate looping inside each process from .xls
 	readInformation(processTables)
 
-	#If There is any change in processes progress, will be send and e-mail for the responsible.
 	if process_arr_data:
+
 		#Connect SMTP and send process update message.
 		connectSMTP()
