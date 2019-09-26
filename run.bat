@@ -1,0 +1,1 @@
+start "RPA NN Franca" "C:/{project-path}/rpa-novos-negocios.py"
