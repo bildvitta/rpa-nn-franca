@@ -15,5 +15,5 @@ ANO	|   Nº PROTOCOLO	| PROCESSO	| PROCESSO	                 | PROJETO	         
 ## Roadmap 
 
 - Implementar leitura de excel do sharepoint
-- Notificação também quando não houver alteração de projetos
+- ~~Notificação também quando não houver alteração de projetos~~
 - Criar validador de erro no processo ("na pesquisa, caso o processo não consiga ser pesquisado, lidar com a continuação")
