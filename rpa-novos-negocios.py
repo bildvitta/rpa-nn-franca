@@ -1,16 +1,37 @@
-from automagica import ChromeBrowser
 from dotenv import load_dotenv
+from automagica import ChromeBrowser
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from oauth2client.service_account import ServiceAccountCredentials
 
 import os
 import time
 import smtplib
-import datetime
-import pandas as pd
+import gspread
+from datetime import datetime
 
 # Loading .env file variables.
 load_dotenv()
+
+scope = ['https://spreadsheets.google.com/feeds',
+         'https://www.googleapis.com/auth/drive']
+
+credentials = ServiceAccountCredentials.from_json_keyfile_name(
+    os.getenv('GS_CREDENTIALS_PATH'),
+    scope
+)
+
+gc = gspread.authorize(credentials)
+
+# Open a worksheet from spreadsheet with one shot
+wks = gc.open_by_key(
+    os.getenv('GS_SPREADSHEET_ID')
+).worksheet(
+    os.getenv('GS_WKS_NAME')
+)
+
+# Fetch all processes
+process_list = wks.get_all_values()
 
 # Updated processes.
 process_arr_data = []
@@ -22,39 +43,22 @@ browser = ChromeBrowser()
 email_to_address = ['']
 
 
-def readInformation(fileName):
+def readInformation():
 
     website = 'https://www.franca.sp.gov.br/portal-servico/paginas/publica/processo/consulta.xhtml'
 
-    dataFrame = pd.read_excel(io=fileName)
-    rows = dataFrame['ANO'].count()
-    year, process, password, process_name, project_name = '', '', '', '', ''
+    index = 1
 
-    # Inside rows of .xls
-    for r in range(0, rows):
-        # Inside columns
-        for s in range(0, 6):
-            if (s == 0):
-                year = str(dataFrame.iloc[r, s])
-                print(year)
-            elif (s == 1):
-                process = '0' + str(dataFrame.iloc[r, s])
-                if (len(process) < 6):
-                    process = '0' + process
-                print(process)
-            elif (s == 2):
-                password = str(dataFrame.iloc[r, s])
-                print(password)
-            elif (s == 4):
-                project_name = str(dataFrame.iloc[r, s])
-                print(project_name)
-            else:
-                pass
+    for process in process_list[1:]:
 
-        # Crawl information about selected process.
-        crawl(website, year, process, password, project_name)
-        print('----------- Done ' + str(r+1) + ' -----------')
-
+        if str(process[6]) == 'SIM':
+            # Crawl information about selected process.
+            crawl(website, process[0], process[1],
+                  process[2], process[3], index)
+            print('----------- Done -----------')
+        else:
+            print('----------- Ignoring process -----------')
+        index = index + 1
     return browser.quit()
 
 
@@ -63,7 +67,7 @@ Crawl information about each process.
 '''
 
 
-def crawl(website, year, process, password, project_name):
+def crawl(website, year, process, password, project_name, line_number):
 
     browser.get(website)
 
@@ -78,7 +82,26 @@ def crawl(website, year, process, password, project_name):
     browser.find_element_by_id(
         'formConsulta:senhaMask:pwdInput').send_keys(password)
 
+    # submitting form
     browser.find_element_by_id('formConsulta:j_idt60').click()
+
+    # validando se o processo existe.
+    try:
+
+        browser.find_element_by_xpath(
+            '//*[@id="formConsulta:messages"]/div/ul/li/span').text
+        print('processo não existe.')
+
+        wks.update_acell('I' + str(line_number + 1),
+                         datetime.now().strftime('%d-%m-%Y %H:%M:%S'))
+        wks.update_acell('J' + str(line_number + 1), 'ERRO')
+
+        return
+    except:
+        wks.update_acell('I' + str(line_number + 1),
+                         datetime.now().strftime('%d-%m-%Y %H:%M:%S'))
+        wks.update_acell('J' + str(line_number + 1), 'OK')
+        print('processo existe, continuando.')
 
     position = (len(browser.find_elements_by_xpath(
         '//*[@id="formConsulta:j_idt108_data"]/tr')))
@@ -119,8 +142,10 @@ def crawl(website, year, process, password, project_name):
 
     if (checkDate(data.text)):
         process_arr_data.append({'Ano': year, 'Nome do projeto': project_name, 'Protocolo': process, 'Nome do Processo': process_name,
-                                 'Processo': password, 'Data': data.text, 'Texto': origin.text, 'Destino': destination.text, 'Manifestação': manifest.text})
+                                 'Processo': password, 'Data': data.text, 'Origem': origin.text, 'Destino': destination.text, 'Manifestação': manifest.text})
         print(str(process) + ': houve alteração')
+        wks.update_acell('H' + str(line_number + 1),
+                         datetime.now().strftime('%d-%m-%Y %H:%M:%S'))
 
     else:
         print(str(process) + ': sem alteração')
@@ -129,8 +154,7 @@ def crawl(website, year, process, password, project_name):
 # Compare process date to current date
 def checkDate(date):
 
-    curr_date = datetime.datetime.now()
-    curr_format_date = curr_date.strftime("%d/%m/%Y")
+    curr_format_date = datetime.now().strftime("%d/%m/%Y")
 
     return (curr_format_date == date) if True else False
 
@@ -147,7 +171,7 @@ def sendNotificationEmail():
     server.login(os.getenv('SMTP_USER'), os.getenv('SMTP_PASS'))
 
     msg = MIMEMultipart()
-    msg['From'] = os.getenv('MAIL_FROM')
+    msg['From'] = os.getenv('SMTP_MAIL_FROM')
     msg['To'] = ', '.join(email_to_address)
     msg['Subject'] = 'Relatório de Acompanhamento RPA - Incorporação Bild & Vitta Franca'
 
@@ -155,18 +179,19 @@ def sendNotificationEmail():
     if process_arr_data:
         body = formatText()
     else:
-        body = 'Olá, tudo bem? Eu sou o robozinho que veio ajudar na verificação do andamento dos processos.\nNão houveram alterações em projetos até o momento!'
+        body = 'Eu sou o JARVIS, escaneei o site da Prefeitura para o senhor(a) e não encontrei nada de novo!'
 
     msg.attach(MIMEText(body, 'plain'))
 
-    server.sendmail(os.getenv('MAIL_FROM'), email_to_address, msg.as_string())
+    server.sendmail(os.getenv('SMTP_MAIL_FROM'),
+                    email_to_address, msg.as_string())
 
     return server.quit()
 
 
 def formatText():
 
-    text = 'Olá, tudo bem? Eu sou o robozinho que veio ajudar na verificação do andamento dos processos. Segue abaixo os protocolos que foram atualizados recentemente!\n\n\n'
+    text = 'Eu sou o JARVIS, escaneei o site da Prefeitura para o senhor(a) e olha os trâmites que encontrei:\n\n'
 
     for index_arr in range(len(process_arr_data)):
         for key, val in process_arr_data[index_arr].items():
@@ -178,10 +203,7 @@ def formatText():
 
 if __name__ == "__main__":
 
-    # Complete path to .xls file, so it works thru a bat file.
-    processTables = 'C:\\Users\\DELL\\Documents\\projetos\\rpa-nn\\processos-regional-franca.xlsx'
-
-    readInformation(processTables)
+    readInformation()
 
     print('Tentando enviar e-mail.')
 
