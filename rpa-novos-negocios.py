@@ -40,7 +40,7 @@ process_arr_data = []
 browser = ChromeBrowser()
 
 # E-mail address list to send notifications to.
-email_to_address = ['']
+email_to_address = ['estevao.simoes@bild.com.br']
 
 
 def readInformation():
@@ -54,7 +54,7 @@ def readInformation():
         if str(process[6]) == 'SIM':
             # Crawl information about selected process.
             crawl(website, process[0], process[1],
-                  process[2], process[3], index)
+                  process[2], process[4], index)
             print('----------- Done -----------')
         else:
             print('----------- Ignoring process -----------')
