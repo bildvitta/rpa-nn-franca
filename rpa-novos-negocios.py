@@ -83,7 +83,7 @@ def crawl(website, year, process, password, project_name, line_number):
         'formConsulta:senhaMask:pwdInput').send_keys(password)
 
     # submitting form
-    browser.find_element_by_id('formConsulta:j_idt60').click()
+    browser.find_element_by_id('formConsulta:j_idt65').click()
 
     # validando se o processo existe.
     try:
@@ -104,7 +104,8 @@ def crawl(website, year, process, password, project_name, line_number):
         print('processo existe, continuando.')
 
     position = (len(browser.find_elements_by_xpath(
-        '//*[@id="formConsulta:j_idt108_data"]/tr')))
+        '//*[@id="formConsulta:j_idt115_data"]/tr'))
+    )
 
     try:
         process_name = (str(browser.find_element_by_xpath(
@@ -115,7 +116,7 @@ def crawl(website, year, process, password, project_name, line_number):
 
     try:
         browser.find_element_by_xpath(
-            '//*[@id="formConsulta:j_idt108_data"]/tr[' + str(position) + ']/td/a').click()
+            '//*[@id="formConsulta:j_idt115_data"]/tr[' + str(position) + ']/td/a').click()
     except:
         print("Single page process. Going to the next one.")
 
@@ -123,20 +124,20 @@ def crawl(website, year, process, password, project_name, line_number):
     time.sleep(0.8)
 
     innerPagePosition = len(browser.find_elements_by_xpath(
-        '//*[@id="formConsulta:j_idt143_data"]/tr'))
+        '//*[@id="formConsulta:j_idt153_data"]/tr'))
 
     # Catch the last position, latest move.
     data = browser.find_element_by_xpath(
-        '//*[@id="formConsulta:j_idt143_data"]/tr[' + str(innerPagePosition) + ']/td[2]')
+        '//*[@id="formConsulta:j_idt153_data"]/tr[' + str(innerPagePosition) + ']/td[2]')
 
     origin = browser.find_element_by_xpath(
-        '//*[@id="formConsulta:j_idt143_data"]/tr[' + str(innerPagePosition) + ']/td[3]')
+        '//*[@id="formConsulta:j_idt153_data"]/tr[' + str(innerPagePosition) + ']/td[3]')
 
     destination = browser.find_element_by_xpath(
-        '//*[@id="formConsulta:j_idt143_data"]/tr[' + str(innerPagePosition) + ']/td[4]')
+        '//*[@id="formConsulta:j_idt153_data"]/tr[' + str(innerPagePosition) + ']/td[4]')
 
     manifest = browser.find_element_by_xpath(
-        '//*[@id="formConsulta:j_idt143_data"]/tr[' + str(innerPagePosition) + ']/td[5]')
+        '//*[@id="formConsulta:j_idt153_data"]/tr[' + str(innerPagePosition) + ']/td[5]')
 
     print(data.text, origin.text, destination.text, manifest.text)
 
